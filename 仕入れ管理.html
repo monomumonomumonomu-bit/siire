@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>仕入れ管理</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', sans-serif;
+    background: #f2f4f7; color: #1a1a1a;
+    -webkit-tap-highlight-color: transparent;
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+  .header {
+    background: #fff; padding: 10px 16px;
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid #e5e7eb;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .header-left { display: flex; align-items: center; gap: 8px; }
+  .header .title { font-size: 15px; font-weight: 700; }
+  .header-right { display: flex; align-items: center; gap: 10px; }
+  .store-counter { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #6b7280; }
+  .cnt-btn {
+    width: 30px; height: 30px; border-radius: 8px; border: none;
+    font-size: 16px; font-weight: 700; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .cnt-minus { background: #ef4444; color: #fff; }
+  .cnt-plus { background: #22c55e; color: #fff; }
+  .cnt-val { font-size: 18px; font-weight: 700; color: #1a1a1a; min-width: 24px; text-align: center; }
+  .btn-gear {
+    background: none; border: none; font-size: 20px; cursor: pointer;
+    color: #9ca3af; padding: 4px;
+  }
+
+  .container { max-width: 480px; margin: 0 auto; padding: 12px; }
+
+  .dashboard { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+  .dash-card { background: #fff; border-radius: 10px; padding: 10px 12px; border: 1px solid #e5e7eb; }
+  .dash-card .d-label { font-size: 10px; color: #6b7280; margin-bottom: 2px; }
+  .dash-card .d-value { font-size: 17px; font-weight: 800; color: #1a1a1a; }
+  .dash-card .d-value.green { color: #16a34a; }
+  .dash-card .d-value.red { color: #dc2626; }
+  .dash-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+
+  .date-tabs {
+    display: flex; gap: 8px; margin-bottom: 16px; overflow-x: auto;
+    border-bottom: 1px solid #e5e7eb; padding-bottom: 12px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .date-tab {
+    padding: 8px 18px; border-radius: 20px; border: none; white-space: nowrap;
+    font-size: 14px; font-weight: 600; cursor: pointer;
+    background: #e5e7eb; color: #6b7280; transition: all 0.2s; flex-shrink: 0;
+  }
+  .date-tab.active { background: #2563eb; color: #fff; }
+
+  .section-header {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 15px; font-weight: 600; margin-bottom: 12px; color: #1a1a1a;
+    cursor: pointer; user-select: none;
+  }
+  .section-header .plus { color: #2563eb; font-size: 20px; }
+  .section-header .arrow { color: #9ca3af; font-size: 12px; transition: transform 0.3s; margin-left: auto; }
+  .section-header .arrow.closed { transform: rotate(-90deg); }
+
+  .form-section { margin-bottom: 16px; }
+  .form-body { overflow: hidden; transition: max-height 0.3s ease; }
+  .form-body.collapsed { max-height: 0 !important; }
+
+  .form-group { margin-bottom: 10px; }
+  .form-group label { display: block; font-size: 12px; color: #6b7280; margin-bottom: 4px; font-weight: 500; }
+  .form-group input, .form-group select, .form-group textarea {
+    width: 100%; padding: 12px 14px;
+    background: #fff; border: 1px solid #d1d5db; border-radius: 10px;
+    color: #1a1a1a; font-size: 16px; outline: none;
+    font-family: inherit; transition: border-color 0.2s;
+    -webkit-appearance: none;
+  }
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: #2563eb; box-shadow: 0 0 0 2px rgba(37,99,235,0.12); }
+  .form-group input::placeholder, .form-group textarea::placeholder { color: #9ca3af; }
+  .form-group textarea { resize: vertical; min-height: 50px; }
+  .form-group select { color: #6b7280; }
+  .form-group select option { background: #fff; color: #1a1a1a; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  .commission-display {
+    padding: 12px 14px; background: #f9fafb; border: 1px solid #d1d5db;
+    border-radius: 10px; font-size: 16px; color: #6b7280;
+    display: flex; align-items: center; gap: 6px; min-height: 48px;
+  }
+  .commission-display .indicator { color: #dc2626; font-weight: 700; }
+
+  .btn-add {
+    width: 100%; padding: 14px; border: none; border-radius: 12px;
+    background: #d1d5db; color: #9ca3af; font-size: 16px; font-weight: 700;
+    cursor: pointer; transition: all 0.2s; margin-top: 4px;
+  }
+  .btn-add.ready { background: #2563eb; color: #fff; }
+  .btn-add:active { transform: scale(0.98); }
+
+  /* Photo & AI scan area */
+  .scan-area {
+    background: #f0f4ff; border: 1px solid #dbeafe; border-radius: 12px;
+    padding: 12px; margin-bottom: 12px;
+  }
+  .scan-label { font-size: 13px; font-weight: 600; color: #4b5563; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+  .photo-row {
+    display: flex; gap: 8px; align-items: center; margin-bottom: 8px;
+    overflow-x: auto; padding-bottom: 4px; -webkit-overflow-scrolling: touch;
+  }
+  .photo-add {
+    min-width: 56px; height: 56px; border-radius: 10px;
+    border: 2px dashed #cbd5e1; background: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px; color: #9ca3af; cursor: pointer; flex-shrink: 0;
+  }
+  .photo-add input { display: none; }
+  .photo-thumb { position: relative; min-width: 56px; height: 56px; border-radius: 10px; overflow: hidden; flex-shrink: 0; }
+  .photo-thumb img { width: 56px; height: 56px; object-fit: cover; }
+  .photo-thumb .rm {
+    position: absolute; top: 2px; right: 2px;
+    background: rgba(0,0,0,0.6); color: #fff; border: none;
+    border-radius: 50%; width: 20px; height: 20px; font-size: 11px;
+    cursor: pointer; line-height: 20px; text-align: center;
+  }
+  .btn-scan {
+    width: 100%; padding: 12px; border: none; border-radius: 10px;
+    background: #7c3aed; color: #fff; font-size: 15px; font-weight: 700;
+    cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
+    transition: all 0.2s;
+  }
+  .btn-scan:disabled { background: #d1d5db; color: #9ca3af; cursor: not-allowed; }
+  .btn-scan:not(:disabled):active { transform: scale(0.98); background: #6d28d9; }
+  .btn-scan .spinner { display: none; width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.6s linear infinite; }
+  .btn-scan.loading .spinner { display: inline-block; }
+  .btn-scan.loading .scan-text { display: none; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* AI results preview */
+  .ai-results { margin-top: 10px; }
+  .ai-result-card {
+    background: #fff; border: 1px solid #e0d4f7; border-radius: 10px;
+    padding: 12px; margin-bottom: 8px;
+  }
+  .ai-result-card .ar-name { font-size: 14px; font-weight: 700; margin-bottom: 4px; color: #1a1a1a; }
+  .ai-result-card .ar-details { font-size: 12px; color: #6b7280; }
+  .ai-result-card .ar-details span { margin-right: 8px; }
+  .ai-result-actions { display: flex; gap: 6px; margin-top: 8px; }
+  .btn-ar {
+    padding: 6px 14px; border-radius: 8px; border: none;
+    font-size: 12px; font-weight: 600; cursor: pointer;
+  }
+  .btn-ar-add { background: #16a34a; color: #fff; }
+  .btn-ar-edit { background: #fff; color: #6b7280; border: 1px solid #d1d5db; }
+  .btn-ar-all {
+    width: 100%; padding: 12px; border: none; border-radius: 10px;
+    background: #2563eb; color: #fff; font-size: 15px; font-weight: 700;
+    cursor: pointer; margin-top: 4px;
+  }
+  .btn-ar-all:active { transform: scale(0.98); }
+
+  .no-api-hint {
+    text-align: center; padding: 8px; font-size: 12px; color: #9ca3af;
+  }
+  .no-api-hint a { color: #7c3aed; text-decoration: underline; cursor: pointer; }
+
+  .list-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .list-header .list-title { font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+  .list-btns { display: flex; gap: 6px; }
+  .btn-sm-action {
+    padding: 6px 12px; border-radius: 8px; border: 1px solid #d1d5db;
+    background: #fff; color: #6b7280; font-size: 12px; font-weight: 600;
+    cursor: pointer; display: flex; align-items: center; gap: 4px;
+  }
+
+  .date-group-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 0; margin-top: 8px; margin-bottom: 6px;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  .date-group-header .dg-date { font-size: 14px; font-weight: 700; color: #4b5563; }
+  .date-group-header .dg-stats { font-size: 12px; color: #9ca3af; }
+  .date-group-header .dg-stats .dg-profit { color: #16a34a; font-weight: 600; }
+  .date-group-header .dg-stats .dg-profit.neg { color: #dc2626; }
+
+  .product-card {
+    background: #fff; border-radius: 12px; padding: 14px;
+    margin-bottom: 8px; border: 1px solid #e5e7eb; position: relative;
+  }
+  .product-card .p-name { font-size: 15px; font-weight: 700; margin-bottom: 6px; padding-right: 30px; color: #1a1a1a; }
+  .product-card .p-details { font-size: 13px; color: #6b7280; line-height: 1.7; }
+  .product-card .p-details span { margin-right: 10px; }
+  .p-profit { color: #16a34a; font-weight: 700; }
+  .p-profit.neg { color: #dc2626; }
+  .product-card .p-close {
+    position: absolute; top: 12px; right: 12px;
+    background: none; border: none; color: #d1d5db; font-size: 18px;
+    cursor: pointer; padding: 4px;
+  }
+  .product-card .p-supplier { font-size: 11px; color: #9ca3af; margin-top: 4px; }
+  .product-card .p-memo { font-size: 12px; color: #9ca3af; margin-top: 4px; font-style: italic; }
+  .product-card .p-edit {
+    background: none; border: 1px solid #e5e7eb; color: #6b7280;
+    font-size: 11px; padding: 3px 10px; border-radius: 6px;
+    cursor: pointer; margin-top: 6px;
+  }
+
+  /* Settings modal */
+  .settings-bg {
+    display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.4); z-index: 2000;
+    justify-content: center; align-items: flex-end;
+  }
+  .settings-bg.show { display: flex; }
+  .settings-panel {
+    background: #fff; border-radius: 16px 16px 0 0;
+    padding: 20px; width: 100%; max-width: 480px;
+    max-height: 80vh; overflow-y: auto;
+  }
+  .settings-panel h2 { font-size: 16px; font-weight: 700; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; color: #1a1a1a; }
+  .settings-panel .s-group { margin-bottom: 16px; }
+  .settings-panel .s-group label { display: block; font-size: 12px; color: #6b7280; margin-bottom: 4px; }
+  .settings-panel .s-group input {
+    width: 100%; padding: 12px; background: #f9fafb; border: 1px solid #d1d5db;
+    border-radius: 10px; color: #1a1a1a; font-size: 14px; font-family: monospace;
+  }
+  .settings-panel .s-group input:focus { border-color: #7c3aed; outline: none; }
+  .settings-panel .s-hint { font-size: 11px; color: #9ca3af; margin-top: 4px; line-height: 1.5; }
+  .settings-panel .s-hint a { color: #7c3aed; }
+  .btn-save-settings {
+    width: 100%; padding: 14px; border: none; border-radius: 12px;
+    background: #7c3aed; color: #fff; font-size: 16px; font-weight: 700;
+    cursor: pointer;
+  }
+  .settings-panel .s-status { margin-top: 12px; text-align: center; font-size: 13px; }
+  .s-status.ok { color: #16a34a; }
+  .s-status.ng { color: #dc2626; }
+
+  /* Image modal */
+  .modal-bg {
+    display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.9); z-index: 1000;
+    justify-content: center; align-items: center;
+  }
+  .modal-bg.show { display: flex; }
+  .modal-bg img { max-width: 95%; max-height: 90%; border-radius: 8px; }
+  .modal-bg .m-close {
+    position: absolute; top: 16px; right: 16px;
+    background: none; border: none; color: #fff; font-size: 28px; cursor: pointer;
+  }
+
+  .toast {
+    position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+    background: #1e293b; color: #fff; padding: 10px 24px; border-radius: 20px;
+    font-size: 14px; font-weight: 600; display: none; z-index: 999;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  }
+  .toast.show { display: block; animation: toastAnim 2s ease; }
+  @keyframes toastAnim {
+    0% { opacity:0; transform: translateX(-50%) translateY(10px); }
+    10% { opacity:1; transform: translateX(-50%) translateY(0); }
+    80% { opacity:1; } 100% { opacity:0; }
+  }
+  .toast.error { background: #dc2626; }
+
+  .empty { text-align: center; padding: 40px 20px; color: #9ca3af; }
+  .empty .icon { font-size: 40px; margin-bottom: 8px; }
+  .empty p { font-size: 14px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <span style="font-size:16px">📊</span>
+    <span class="title">本日の仕入れ成績</span>
+  </div>
+  <div class="header-right">
+    <div class="store-counter">
+      <span>🏪</span>
+      <button class="cnt-btn cnt-minus" onclick="changeStores(-1)">−</button>
+      <span class="cnt-val" id="storeCount">0</span>
+      <button class="cnt-btn cnt-plus" onclick="changeStores(1)">+</button>
+    </div>
+    <button class="btn-gear" onclick="openSettings()">⚙️</button>
+  </div>
+</div>
+
+<div class="container">
+  <div class="dashboard">
+    <div class="dash-card"><div class="d-label">仕入れ数</div><div class="d-value" id="dCount">0点</div></div>
+    <div class="dash-card"><div class="d-label">仕入れ総額</div><div class="d-value" id="dCost">¥0</div></div>
+    <div class="dash-card"><div class="d-label">見込み利益</div><div class="d-value green" id="dProfit">¥0</div></div>
+  </div>
+  <div class="dash-row2">
+    <div class="dash-card"><div class="d-label">平均粗利単価</div><div class="d-value" id="dAvgProfit">¥0</div></div>
+    <div class="dash-card"><div class="d-label">平均粗利率</div><div class="d-value green" id="dMargin">0%</div></div>
+  </div>
+
+  <div class="date-tabs" id="dateTabs"></div>
+
+  <!-- Scan & Add form -->
+  <div class="form-section">
+    <div class="section-header" onclick="toggleForm()">
+      <span class="plus">＋</span> 商品を追加
+      <span class="arrow" id="formArrow">▼</span>
+    </div>
+    <div class="form-body" id="formBody">
+
+      <!-- AI Scan area -->
+      <div class="scan-area">
+        <div class="scan-label">🤖 AI読み取り（レシート・値札）</div>
+        <div class="photo-row" id="photoRow">
+          <div class="photo-add" id="photoAddBtn">
+            📷 <input type="file" id="fileInput" accept="image/*" multiple capture="environment">
+          </div>
+        </div>
+        <button class="btn-scan" id="btnScan" disabled onclick="scanImages()">
+          <span class="scan-text">🔍 AIで読み取る</span>
+          <span class="spinner"></span>
+          <span class="loading-text" style="display:none">読み取り中...</span>
+        </button>
+        <div id="noApiHint" class="no-api-hint" style="display:none">
+          APIキー未設定 — <a onclick="openSettings()">設定</a>から入力してください
+        </div>
+        <div class="ai-results" id="aiResults"></div>
+      </div>
+
+      <!-- Manual form -->
+      <div class="form-group">
+        <label>商品名（任意）</label>
+        <input type="text" id="productName" placeholder="ブランド 商品名 型番">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>仕入れ値（円）</label>
+          <input type="number" id="costPrice" inputmode="numeric" placeholder="0" oninput="liveCalc()">
+        </div>
+        <div class="form-group">
+          <label>想定売値（円）</label>
+          <input type="number" id="sellPrice" inputmode="numeric" placeholder="0" oninput="liveCalc()">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>送料（円）</label>
+          <input type="number" id="shipping" inputmode="numeric" placeholder="0" oninput="liveCalc()">
+        </div>
+        <div class="form-group">
+          <label>手数料（自動）</label>
+          <div class="commission-display">
+            <span class="indicator">−</span> <span id="commDisplay">10%</span>
+          </div>
+        </div>
+      </div>
+      <div class="form-row" style="margin-bottom:10px">
+        <div class="form-group">
+          <label>仕入先</label>
+          <input type="text" id="supplier" placeholder="例: HO藤沢">
+        </div>
+        <div class="form-group">
+          <label>カテゴリー</label>
+          <select id="category">
+            <option value="">選択...</option>
+            <option>家電</option><option>オーディオ</option><option>PC・周辺機器</option>
+            <option>カメラ</option><option>ゲーム</option><option>おもちゃ・ホビー</option>
+            <option>楽器</option><option>ファッション</option><option>ブランド品</option>
+            <option>スポーツ</option><option>工具</option><option>本・メディア</option>
+            <option>その他</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>メモ</label>
+        <textarea id="memo" placeholder="型番・状態・ジャンク理由など" rows="2"></textarea>
+      </div>
+      <button class="btn-add" id="btnAdd" onclick="addItem()">追加する</button>
+    </div>
+  </div>
+
+  <div class="list-header">
+    <div class="list-title">📦 商品一覧（<span id="listCount">0</span>点）</div>
+    <div class="list-btns">
+      <button class="btn-sm-action" onclick="copyForSheet()">📋 コピー</button>
+      <button class="btn-sm-action" onclick="exportCSV()">📤 CSV</button>
+    </div>
+  </div>
+  <div id="productList"></div>
+</div>
+
+<!-- Settings -->
+<div class="settings-bg" id="settingsBg">
+  <div class="settings-panel">
+    <h2>⚙️ 設定</h2>
+    <div class="s-group">
+      <label>Anthropic APIキー</label>
+      <input type="password" id="apiKeyInput" placeholder="sk-ant-api03-...">
+      <div class="s-hint">
+        写真からAI読み取りするために必要です。<br>
+        <a href="https://console.anthropic.com/settings/keys" target="_blank">console.anthropic.com</a> で取得できます。<br>
+        キーは端末内(localStorage)に保存され、Anthropic以外には送信されません。
+      </div>
+    </div>
+    <div class="s-group">
+      <label>手数料率（%）</label>
+      <input type="number" id="commRateInput" inputmode="decimal" placeholder="10" value="10">
+    </div>
+    <button class="btn-save-settings" onclick="saveSettings()">保存</button>
+    <div class="s-status" id="settingsStatus"></div>
+    <div style="text-align:center;margin-top:16px">
+      <button style="background:none;border:none;color:#4a5568;font-size:14px;cursor:pointer" onclick="closeSettings()">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal -->
+<div class="modal-bg" id="modal">
+  <button class="m-close" onclick="closeModal()">✕</button>
+  <img id="modalImg" src="">
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+let items = JSON.parse(localStorage.getItem('shiire_items') || '[]');
+let storeCount = Number(localStorage.getItem('shiire_stores') || '0');
+let editIndex = -1;
+let uploadedImages = []; // {dataUrl, base64, mediaType}
+let currentDateFilter = 'today';
+let COMMISSION_RATE = Number(localStorage.getItem('shiire_comm_rate') || '10') / 100;
+let aiResults = [];
+
+function todayStr() {
+  const d = new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('storeCount').textContent = storeCount;
+  document.getElementById('commRateInput').value = COMMISSION_RATE * 100;
+  checkApiKey();
+  buildDateTabs(); renderAll();
+  document.getElementById('fileInput').addEventListener('change', e => handleFiles(e.target.files));
+  document.getElementById('photoAddBtn').addEventListener('click', () => document.getElementById('fileInput').click());
+  document.getElementById('settingsBg').addEventListener('click', e => { if (e.target === e.currentTarget) closeSettings(); });
+});
+
+// === API key ===
+function getApiKey() { return localStorage.getItem('shiire_api_key') || ''; }
+function checkApiKey() {
+  const hasKey = !!getApiKey();
+  document.getElementById('btnScan').disabled = !hasKey && uploadedImages.length === 0;
+  document.getElementById('noApiHint').style.display = hasKey ? 'none' : 'block';
+  updateScanBtn();
+}
+function updateScanBtn() {
+  const btn = document.getElementById('btnScan');
+  btn.disabled = uploadedImages.length === 0 || !getApiKey();
+}
+
+// === Settings ===
+function openSettings() {
+  document.getElementById('apiKeyInput').value = getApiKey();
+  document.getElementById('commRateInput').value = COMMISSION_RATE * 100;
+  document.getElementById('settingsStatus').textContent = '';
+  document.getElementById('settingsBg').classList.add('show');
+}
+function closeSettings() { document.getElementById('settingsBg').classList.remove('show'); }
+function saveSettings() {
+  const key = document.getElementById('apiKeyInput').value.trim();
+  const rate = Number(document.getElementById('commRateInput').value) || 10;
+  if (key) localStorage.setItem('shiire_api_key', key);
+  else localStorage.removeItem('shiire_api_key');
+  COMMISSION_RATE = rate / 100;
+  localStorage.setItem('shiire_comm_rate', rate);
+  checkApiKey();
+  const st = document.getElementById('settingsStatus');
+  st.textContent = '保存しました'; st.className = 's-status ok';
+  setTimeout(closeSettings, 800);
+}
+
+// === Store counter ===
+function changeStores(delta) {
+  storeCount = Math.max(0, storeCount + delta);
+  document.getElementById('storeCount').textContent = storeCount;
+  localStorage.setItem('shiire_stores', storeCount);
+}
+
+// === Date tabs ===
+function buildDateTabs() {
+  const container = document.getElementById('dateTabs');
+  const today = todayStr();
+  const yest = (() => { const d = new Date(); d.setDate(d.getDate()-1); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); })();
+  const allDates = [...new Set(items.map(it => it.purchaseDate).filter(Boolean))].sort().reverse();
+  const tabs = [{ label: '今日', key: 'today' }, { label: '昨日', key: yest }];
+  allDates.forEach(d => { if (d === today || d === yest) return; const dt = new Date(d+'T00:00:00'); tabs.push({ label: (dt.getMonth()+1)+'/'+dt.getDate(), key: d }); });
+  tabs.push({ label: '全件', key: 'all' });
+  container.innerHTML = tabs.map(t => `<button class="date-tab${t.key===currentDateFilter?' active':''}" data-key="${t.key}">${t.label}</button>`).join('');
+  container.querySelectorAll('.date-tab').forEach(btn => btn.addEventListener('click', () => {
+    currentDateFilter = btn.dataset.key;
+    container.querySelectorAll('.date-tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active'); renderAll();
+  }));
+}
+function resolveDate(key) { return key === 'today' ? todayStr() : key; }
+function filteredItems() {
+  if (currentDateFilter === 'all') return items;
+  return items.filter(it => it.purchaseDate === resolveDate(currentDateFilter));
+}
+
+// === Photos ===
+function handleFiles(files) {
+  for (const file of files) {
+    if (!file.type.startsWith('image/')) continue;
+    const reader = new FileReader();
+    reader.onload = e => {
+      const dataUrl = e.target.result;
+      const base64 = dataUrl.split(',')[1];
+      const mediaType = file.type;
+      uploadedImages.push({ dataUrl, base64, mediaType });
+      renderPhotos(); updateScanBtn();
+    };
+    reader.readAsDataURL(file);
+  }
+}
+function renderPhotos() {
+  const row = document.getElementById('photoRow');
+  const thumbs = uploadedImages.map((img, i) => `
+    <div class="photo-thumb">
+      <img src="${img.dataUrl}" onclick="openImgModal(${i})">
+      <button class="rm" onclick="event.stopPropagation();uploadedImages.splice(${i},1);renderPhotos();updateScanBtn()">✕</button>
+    </div>`).join('');
+  row.innerHTML = thumbs + `<div class="photo-add" id="photoAddBtn">📷<input type="file" id="fileInput" accept="image/*" multiple capture="environment"></div>`;
+  document.getElementById('fileInput').addEventListener('change', e => handleFiles(e.target.files));
+  document.getElementById('photoAddBtn').addEventListener('click', () => document.getElementById('fileInput').click());
+}
+function openImgModal(i) { document.getElementById('modalImg').src = uploadedImages[i]?.dataUrl || ''; document.getElementById('modal').classList.add('show'); }
+function closeModal() { document.getElementById('modal').classList.remove('show'); }
+document.getElementById('modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeModal(); });
+
+// === AI Scan ===
+async function scanImages() {
+  const apiKey = getApiKey();
+  if (!apiKey || uploadedImages.length === 0) return;
+
+  const btn = document.getElementById('btnScan');
+  btn.classList.add('loading');
+  btn.querySelector('.loading-text').style.display = 'inline';
+  btn.disabled = true;
+
+  const imageContent = uploadedImages.map(img => ({
+    type: 'image',
+    source: { type: 'base64', media_type: img.mediaType, data: img.base64 }
+  }));
+
+  const prompt = `これはせどり（転売ビジネス）の仕入れレシートまたは値札の写真です。
+写真から以下の情報を商品ごとに抽出してJSON配列で返してください。
+
+1枚のレシートに複数商品がある場合は、商品ごとに分けてください。
+
+各商品のJSONフォーマット:
+{
+  "productName": "ブランド/メーカー名 商品名 型番（わかれば）",
+  "costPrice": 税込仕入れ値（数値）,
+  "supplier": "店舗名（略称可、例: HO藤沢）",
+  "category": "カテゴリー（家電/オーディオ/PC・周辺機器/カメラ/ゲーム/おもちゃ・ホビー/楽器/ファッション/ブランド品/スポーツ/工具/本・メディア/その他）",
+  "memo": "状態や補足（ジャンクなら理由も）"
+}
+
+店舗名の略称ルール: ハードオフ→HO、オフハウス→OH、トレジャーファクトリー→TF、ブックオフ→BO、セカンドストリート→SS など + 店舗名
+
+重要:
+- 必ずJSON配列のみを返してください（説明文不要）
+- 金額は数値のみ（¥やカンマなし）
+- 読み取れない項目は空文字""にしてください
+- 値札の場合は1商品として抽出`;
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 2000,
+        messages: [{
+          role: 'user',
+          content: [...imageContent, { type: 'text', text: prompt }]
+        }]
+      })
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error?.message || `API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const text = data.content?.[0]?.text || '';
+
+    // Extract JSON array from response
+    const jsonMatch = text.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) throw new Error('読み取り結果を解析できませんでした');
+
+    aiResults = JSON.parse(jsonMatch[0]);
+    renderAiResults();
+    showToast(`${aiResults.length}件の商品を検出しました`);
+
+  } catch (err) {
+    showToast(err.message, true);
+  } finally {
+    btn.classList.remove('loading');
+    btn.querySelector('.loading-text').style.display = 'none';
+    btn.disabled = false;
+    updateScanBtn();
+  }
+}
+
+function renderAiResults() {
+  const container = document.getElementById('aiResults');
+  if (aiResults.length === 0) { container.innerHTML = ''; return; }
+
+  let html = aiResults.map((r, i) => `
+    <div class="ai-result-card">
+      <div class="ar-name">${esc(r.productName || '不明')}</div>
+      <div class="ar-details">
+        <span>仕入値: <b>¥${(r.costPrice||0).toLocaleString()}</b></span>
+        ${r.supplier ? '<span>🏪 '+esc(r.supplier)+'</span>' : ''}
+        ${r.category ? '<span>'+esc(r.category)+'</span>' : ''}
+      </div>
+      ${r.memo ? '<div class="ar-details" style="margin-top:2px;font-style:italic">'+esc(r.memo)+'</div>' : ''}
+      <div class="ai-result-actions">
+        <button class="btn-ar btn-ar-add" onclick="addAiResult(${i})">追加</button>
+        <button class="btn-ar btn-ar-edit" onclick="editAiResult(${i})">編集して追加</button>
+      </div>
+    </div>`).join('');
+
+  if (aiResults.length > 1) {
+    html += `<button class="btn-ar-all" onclick="addAllAiResults()">全${aiResults.length}件をまとめて追加</button>`;
+  }
+  container.innerHTML = html;
+}
+
+function addAiResult(i) {
+  const r = aiResults[i];
+  const cost = Number(r.costPrice) || 0;
+  const purchaseDate = (currentDateFilter === 'all' || currentDateFilter === 'today') ? todayStr() : resolveDate(currentDateFilter);
+  const item = {
+    productName: r.productName || '商品',
+    costPrice: cost, sellPrice: 0, shipping: 0,
+    commission: 0, profit: -cost, margin: 0,
+    supplier: r.supplier || '',
+    category: r.category || '',
+    memo: r.memo || '',
+    purchaseDate,
+    images: uploadedImages.map(img => img.dataUrl),
+    createdAt: new Date().toISOString()
+  };
+  items.unshift(item); save(); renderAll();
+  aiResults.splice(i, 1); renderAiResults();
+  showToast('追加しました');
+}
+
+function editAiResult(i) {
+  const r = aiResults[i];
+  document.getElementById('productName').value = r.productName || '';
+  document.getElementById('costPrice').value = r.costPrice || '';
+  document.getElementById('supplier').value = r.supplier || '';
+  document.getElementById('category').value = r.category || '';
+  document.getElementById('memo').value = r.memo || '';
+  liveCalc();
+  aiResults.splice(i, 1); renderAiResults();
+  document.getElementById('productName').focus();
+}
+
+function addAllAiResults() {
+  const purchaseDate = (currentDateFilter === 'all' || currentDateFilter === 'today') ? todayStr() : resolveDate(currentDateFilter);
+  const imgs = uploadedImages.map(img => img.dataUrl);
+  aiResults.forEach(r => {
+    const cost = Number(r.costPrice) || 0;
+    items.unshift({
+      productName: r.productName || '商品',
+      costPrice: cost, sellPrice: 0, shipping: 0,
+      commission: 0, profit: -cost, margin: 0,
+      supplier: r.supplier || '', category: r.category || '',
+      memo: r.memo || '', purchaseDate, images: imgs,
+      createdAt: new Date().toISOString()
+    });
+  });
+  save();
+  const count = aiResults.length;
+  aiResults = []; renderAiResults();
+  uploadedImages = []; renderPhotos(); updateScanBtn();
+  renderAll();
+  showToast(`${count}件を追加しました`);
+}
+
+// === Live calc ===
+function liveCalc() {
+  const sell = Number(document.getElementById('sellPrice').value) || 0;
+  const comm = Math.round(sell * COMMISSION_RATE);
+  document.getElementById('commDisplay').textContent = sell > 0 ? `${COMMISSION_RATE*100}% (¥${comm.toLocaleString()})` : `${COMMISSION_RATE*100}%`;
+  const cost = Number(document.getElementById('costPrice').value) || 0;
+  document.getElementById('btnAdd').classList.toggle('ready', cost > 0 || sell > 0);
+}
+
+function toggleForm() {
+  document.getElementById('formBody').classList.toggle('collapsed');
+  document.getElementById('formArrow').classList.toggle('closed');
+}
+
+function formatDate(dateStr) { if (!dateStr) return ''; const d = new Date(dateStr+'T00:00:00'); return d.getFullYear()+'/'+(d.getMonth()+1)+'/'+d.getDate(); }
+function dayOfWeek(dateStr) { const days=['日','月','火','水','木','金','土']; return days[new Date(dateStr+'T00:00:00').getDay()]; }
+
+function addItem() {
+  const name = document.getElementById('productName').value.trim();
+  const cost = Number(document.getElementById('costPrice').value) || 0;
+  const sell = Number(document.getElementById('sellPrice').value) || 0;
+  const ship = Number(document.getElementById('shipping').value) || 0;
+  const comm = Math.round(sell * COMMISSION_RATE);
+  const profit = sell - cost - comm - ship;
+  const margin = sell > 0 ? (profit / sell * 100) : 0;
+  const purchaseDate = (currentDateFilter === 'all' || currentDateFilter === 'today') ? todayStr() : resolveDate(currentDateFilter);
+  const item = {
+    productName: name || ('商品'+(items.length+1)),
+    costPrice: cost, sellPrice: sell, shipping: ship,
+    commission: comm, profit, margin,
+    supplier: document.getElementById('supplier').value.trim(),
+    category: document.getElementById('category').value,
+    memo: document.getElementById('memo').value.trim(),
+    purchaseDate, images: uploadedImages.map(img => img.dataUrl),
+    createdAt: new Date().toISOString()
+  };
+  if (editIndex >= 0) { items[editIndex] = item; editIndex = -1; }
+  else items.unshift(item);
+  save(); clearForm(); renderAll();
+  showToast('追加しました');
+}
+
+function editItem(gi) {
+  const item = items[gi];
+  document.getElementById('productName').value = item.productName || '';
+  document.getElementById('costPrice').value = item.costPrice || '';
+  document.getElementById('sellPrice').value = item.sellPrice || '';
+  document.getElementById('shipping').value = item.shipping || '';
+  document.getElementById('supplier').value = item.supplier || '';
+  document.getElementById('category').value = item.category || '';
+  document.getElementById('memo').value = item.memo || '';
+  uploadedImages = (item.images||[]).map(url => ({ dataUrl: url, base64: '', mediaType: '' }));
+  renderPhotos(); editIndex = gi; liveCalc();
+  document.getElementById('formBody').classList.remove('collapsed');
+  document.getElementById('formArrow').classList.remove('closed');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function deleteItem(gi) { items.splice(gi, 1); save(); renderAll(); showToast('削除しました'); }
+
+function clearForm() {
+  ['productName','costPrice','sellPrice','shipping','supplier','memo'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('category').value = '';
+  document.getElementById('commDisplay').textContent = `${COMMISSION_RATE*100}%`;
+  document.getElementById('btnAdd').classList.remove('ready');
+  uploadedImages = []; renderPhotos(); updateScanBtn();
+  aiResults = []; renderAiResults();
+  editIndex = -1;
+}
+
+function renderAll() { updateDashboard(); renderList(); buildDateTabs(); }
+
+function updateDashboard() {
+  const ti = items.filter(it => it.purchaseDate === todayStr());
+  const count = ti.length;
+  const totalCost = ti.reduce((s,it) => s+it.costPrice, 0);
+  const totalProfit = ti.reduce((s,it) => s+it.profit, 0);
+  const totalSell = ti.reduce((s,it) => s+it.sellPrice, 0);
+  const avgProfit = count > 0 ? Math.round(totalProfit/count) : 0;
+  const avgMargin = totalSell > 0 ? (totalProfit/totalSell*100) : 0;
+  document.getElementById('dCount').textContent = count+'点';
+  document.getElementById('dCost').textContent = '¥'+totalCost.toLocaleString();
+  const pEl = document.getElementById('dProfit');
+  pEl.textContent = '¥'+totalProfit.toLocaleString();
+  pEl.className = 'd-value '+(totalProfit >= 0 ? 'green' : 'red');
+  document.getElementById('dAvgProfit').textContent = '¥'+avgProfit.toLocaleString();
+  const mEl = document.getElementById('dMargin');
+  mEl.textContent = avgMargin.toFixed(1)+'%';
+  mEl.className = 'd-value '+(avgMargin >= 0 ? 'green' : 'red');
+}
+
+function renderList() {
+  const fi = filteredItems();
+  document.getElementById('listCount').textContent = fi.length;
+  const container = document.getElementById('productList');
+  if (fi.length === 0) { container.innerHTML = '<div class="empty"><div class="icon">📦</div><p>まだ商品がありません</p></div>'; return; }
+  const groups = {};
+  fi.forEach(item => { const d = item.purchaseDate||'unknown'; if (!groups[d]) groups[d]=[]; groups[d].push(item); });
+  const sortedDates = Object.keys(groups).sort().reverse();
+  let html = '';
+  sortedDates.forEach(date => {
+    const gi = groups[date];
+    const gCost = gi.reduce((s,it) => s+it.costPrice, 0);
+    const gProfit = gi.reduce((s,it) => s+it.profit, 0);
+    const pc = gProfit >= 0 ? 'dg-profit' : 'dg-profit neg';
+    if (currentDateFilter === 'all' || sortedDates.length > 1)
+      html += `<div class="date-group-header"><span class="dg-date">${formatDate(date)}（${dayOfWeek(date)}）</span><span class="dg-stats">${gi.length}点 ¥${gCost.toLocaleString()} 利益: <span class="${pc}">¥${gProfit.toLocaleString()}</span></span></div>`;
+    gi.forEach(item => {
+      const idx = items.indexOf(item);
+      const pp = item.profit >= 0 ? 'p-profit' : 'p-profit neg';
+      html += `<div class="product-card">
+        <div class="p-name">${esc(item.productName)}</div>
+        <div class="p-details">
+          <span>仕入: <b>¥${item.costPrice.toLocaleString()}</b></span>
+          <span>売値: <b>¥${item.sellPrice.toLocaleString()}</b></span>
+          <span>手数料: <span style="color:#ef4444">¥${item.commission.toLocaleString()}</span></span>
+        </div>
+        <div class="p-details">
+          <span>送料: <span style="color:#f59e0b">¥${item.shipping.toLocaleString()}</span></span>
+          <span class="${pp}">利益: ¥${item.profit.toLocaleString()}</span>
+          <span class="${pp}">粗利率: ${item.margin.toFixed(1)}%</span>
+        </div>
+        ${item.supplier ? '<div class="p-supplier">🏪 '+esc(item.supplier)+'</div>' : ''}
+        ${item.memo ? '<div class="p-memo">'+esc(item.memo)+'</div>' : ''}
+        <button class="p-edit" onclick="editItem(${idx})">編集</button>
+        <button class="p-close" onclick="deleteItem(${idx})">✕</button>
+      </div>`;
+    });
+  });
+  container.innerHTML = html;
+}
+
+// スプレッドシート貼り付け用（タブ区切り・D〜J列順）
+function copyForSheet() {
+  const fi = filteredItems();
+  if (fi.length === 0) { showToast('データがありません'); return; }
+  const rows = fi.map(item => [
+    item.productName,   // D: 品名
+    item.category||'',  // E: カテゴリー
+    '',                 // F: (空欄)
+    formatDate(item.purchaseDate), // G: 仕入れ日
+    item.costPrice,     // H: 金額
+    item.supplier||'',  // I: 仕入れ先
+    'レシート'           // J: 確認方法
+  ].join('\t'));
+  navigator.clipboard.writeText(rows.join('\n')).then(() => showToast('スプレッドシート用にコピーしました'));
+}
+
+// スプレッドシート取り込み用CSV（D〜J列順）
+function exportCSV() {
+  const fi = filteredItems();
+  if (fi.length === 0) { showToast('データがありません'); return; }
+  // ヘッダーはスプレッドシートの列名に合わせる
+  const header = '品名,カテゴリー,,仕入れ日,金額,仕入れ先,確認方法';
+  const rows = fi.map(item => [
+    q(item.productName),
+    q(item.category||''),
+    '',                              // F列（空）
+    formatDate(item.purchaseDate),   // G: 2026/3/31形式
+    item.costPrice,                  // H: 税込仕入れ値
+    q(item.supplier||''),            // I: 仕入れ先
+    'レシート'                        // J: 確認方法
+  ].join(','));
+  const csv = '\uFEFF'+header+'\n'+rows.join('\n');
+  const blob = new Blob([csv],{type:'text/csv;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = '仕入れ管理表_'+(currentDateFilter==='all'?'全件':resolveDate(currentDateFilter))+'.csv';
+  a.click(); showToast('CSVを出力しました');
+}
+
+function q(s) { return '"'+(s||'').replace(/"/g,'""')+'"'; }
+function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function save() { localStorage.setItem('shiire_items', JSON.stringify(items)); }
+function showToast(msg, isError) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast' + (isError ? ' error' : '');
+  void t.offsetWidth; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), isError ? 4000 : 2000);
+}
+</script>
+</body>
+</html>
