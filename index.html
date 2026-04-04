@@ -104,12 +104,19 @@
   }
   .commission-display .indicator { color: #dc2626; font-weight: 700; }
 
+  .btn-add-wrap {
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 200;
+    padding: 10px 12px env(safe-area-inset-bottom, 10px);
+    background: rgba(242,244,247,0.95); backdrop-filter: blur(8px);
+    border-top: 1px solid #e5e7eb;
+  }
   .btn-add {
     width: 100%; padding: 14px; border: none; border-radius: 12px;
     background: #2563eb; color: #fff; font-size: 16px; font-weight: 700;
-    cursor: pointer; transition: all 0.2s; margin-top: 4px;
+    cursor: pointer; transition: background 0.2s;
   }
-  .btn-add:active { transform: scale(0.98); }
+  .btn-add:active { background: #1d4ed8; }
+  .form-body-spacer { height: 72px; }
 
   /* Photo & AI scan area */
   .scan-area {
@@ -401,8 +408,11 @@
         </div>
       </div>
       <textarea id="memo" style="display:none"></textarea>
-      <button class="btn-add ready" id="btnAdd" onclick="addItem()">追加する</button>
+      <div class="form-body-spacer"></div>
     </div>
+  </div>
+  <div class="btn-add-wrap">
+    <button class="btn-add" id="btnAdd" type="button" onclick="addItem()">追加する</button>
   </div>
 
   <div class="list-header">
