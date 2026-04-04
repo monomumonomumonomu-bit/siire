@@ -97,10 +97,9 @@
 
   .btn-add {
     width: 100%; padding: 14px; border: none; border-radius: 12px;
-    background: #d1d5db; color: #9ca3af; font-size: 16px; font-weight: 700;
+    background: #2563eb; color: #fff; font-size: 16px; font-weight: 700;
     cursor: pointer; transition: all 0.2s; margin-top: 4px;
   }
-  .btn-add.ready { background: #2563eb; color: #fff; }
   .btn-add:active { transform: scale(0.98); }
 
   /* Photo & AI scan area */
@@ -336,8 +335,8 @@
 
       <!-- Manual form -->
       <div class="form-group">
-        <label>商品名（任意）</label>
-        <input type="text" id="productName" placeholder="ブランド 商品名 型番">
+        <label>商品名（メーカー名・型番がわかる場合のみ）</label>
+        <input type="text" id="productName" placeholder="例: Nintendo Switch HAC-001、Canon IXY 430F">
       </div>
       <div class="form-row">
         <div class="form-group">
@@ -378,11 +377,8 @@
           </select>
         </div>
       </div>
-      <div class="form-group">
-        <label>メモ</label>
-        <textarea id="memo" placeholder="型番・状態・ジャンク理由など" rows="2"></textarea>
-      </div>
-      <button class="btn-add" id="btnAdd" onclick="addItem()">追加する</button>
+      <textarea id="memo" style="display:none"></textarea>
+      <button class="btn-add ready" id="btnAdd" onclick="addItem()">追加する</button>
     </div>
   </div>
 
@@ -716,7 +712,6 @@ function liveCalc() {
   const comm = Math.round(sell * COMMISSION_RATE);
   document.getElementById('commDisplay').textContent = sell > 0 ? `${COMMISSION_RATE*100}% (¥${comm.toLocaleString()})` : `${COMMISSION_RATE*100}%`;
   const cost = Number(document.getElementById('costPrice').value) || 0;
-  document.getElementById('btnAdd').classList.toggle('ready', cost > 0 || sell > 0);
 }
 
 function toggleForm() {
@@ -774,7 +769,6 @@ function clearForm() {
   ['productName','costPrice','sellPrice','shipping','supplier','memo'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('category').value = '';
   document.getElementById('commDisplay').textContent = `${COMMISSION_RATE*100}%`;
-  document.getElementById('btnAdd').classList.remove('ready');
   uploadedImages = []; renderPhotos(); updateScanBtn();
   aiResults = []; renderAiResults();
   editIndex = -1;
