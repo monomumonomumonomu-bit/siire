@@ -316,8 +316,11 @@
       <div class="scan-area">
         <div class="scan-label">🤖 AI読み取り（レシート・値札）</div>
         <div class="photo-row" id="photoRow">
-          <div class="photo-add" id="photoAddBtn">
+          <div class="photo-add" id="photoCameraBtn">
             📷 <input type="file" id="fileInput" accept="image/*" multiple capture="environment">
+          </div>
+          <div class="photo-add" id="photoLibraryBtn">
+            🖼️ <input type="file" id="fileInputLibrary" accept="image/*" multiple>
           </div>
         </div>
         <button class="btn-scan" id="btnScan" disabled onclick="scanImages()">
@@ -445,7 +448,9 @@ document.addEventListener('DOMContentLoaded', () => {
   checkApiKey();
   buildDateTabs(); renderAll();
   document.getElementById('fileInput').addEventListener('change', e => handleFiles(e.target.files));
-  document.getElementById('photoAddBtn').addEventListener('click', () => document.getElementById('fileInput').click());
+  document.getElementById('fileInputLibrary').addEventListener('change', e => handleFiles(e.target.files));
+  document.getElementById('photoCameraBtn').addEventListener('click', () => document.getElementById('fileInput').click());
+  document.getElementById('photoLibraryBtn').addEventListener('click', () => document.getElementById('fileInputLibrary').click());
   document.getElementById('settingsBg').addEventListener('click', e => { if (e.target === e.currentTarget) closeSettings(); });
 });
 
@@ -534,9 +539,11 @@ function renderPhotos() {
       <img src="${img.dataUrl}" onclick="openImgModal(${i})">
       <button class="rm" onclick="event.stopPropagation();uploadedImages.splice(${i},1);renderPhotos();updateScanBtn()">✕</button>
     </div>`).join('');
-  row.innerHTML = thumbs + `<div class="photo-add" id="photoAddBtn">📷<input type="file" id="fileInput" accept="image/*" multiple capture="environment"></div>`;
+  row.innerHTML = thumbs + `<div class="photo-add" id="photoCameraBtn">📷<input type="file" id="fileInput" accept="image/*" multiple capture="environment"></div><div class="photo-add" id="photoLibraryBtn">🖼️<input type="file" id="fileInputLibrary" accept="image/*" multiple></div>`;
   document.getElementById('fileInput').addEventListener('change', e => handleFiles(e.target.files));
-  document.getElementById('photoAddBtn').addEventListener('click', () => document.getElementById('fileInput').click());
+  document.getElementById('fileInputLibrary').addEventListener('change', e => handleFiles(e.target.files));
+  document.getElementById('photoCameraBtn').addEventListener('click', () => document.getElementById('fileInput').click());
+  document.getElementById('photoLibraryBtn').addEventListener('click', () => document.getElementById('fileInputLibrary').click());
 }
 function openImgModal(i) { document.getElementById('modalImg').src = uploadedImages[i]?.dataUrl || ''; document.getElementById('modal').classList.add('show'); }
 function closeModal() { document.getElementById('modal').classList.remove('show'); }
