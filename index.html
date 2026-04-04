@@ -560,18 +560,30 @@ async function scanImages() {
     source: { type: 'base64', media_type: img.mediaType, data: img.base64 }
   }));
 
-  const prompt = `これはせどり（転売ビジネス）の仕入れレシートまたは値札の写真です。
-写真から以下の情報を商品ごとに抽出してJSON配列で返してください。
+  const prompt = `これはせどり（転売ビジネス）の仕入れに関する写真です。値札のみ・レシートのみ・両方のいずれかです。
 
-1枚のレシートに複数商品がある場合は、商品ごとに分けてください。
+【写真の種類に応じた処理】
+■ 値札のみの場合:
+  - 商品名・型番・金額を抽出する
+  - 仕入先(supplier)は空文字""にする（値札には店舗名がない）
+
+■ レシートのみの場合:
+  - 仕入先・金額・商品名（記載があれば）を抽出する
+  - 商品名が不明な場合はproductNameを空文字""にする
+  - レシートに複数商品があれば商品ごとに分ける
+
+■ 値札とレシートの両方がある場合:
+  - 金額や商品名で同一商品と判断できるものは必ず1件にまとめる
+  - 値札の商品名・型番 ＋ レシートの仕入先 を統合する
+  - 絶対に重複エントリを作らない
 
 各商品のJSONフォーマット:
 {
-  "productName": "ブランド/メーカー名 商品名 型番（わかれば）",
+  "productName": "ブランド/メーカー名 商品名 型番",
   "costPrice": 税込仕入れ値（数値）,
-  "supplier": "店舗名（略称可、例: HO藤沢）",
+  "supplier": "店舗名略称（レシートから取得、例: HO藤沢）",
   "category": "カテゴリー（家電/オーディオ/PC・周辺機器/カメラ/ゲーム/おもちゃ・ホビー/楽器/ファッション/ブランド品/スポーツ/工具/本・メディア/その他）",
-  "memo": "状態や補足（ジャンクなら理由も）"
+  "memo": ""
 }
 
 店舗名の略称ルール: ハードオフ→HO、オフハウス→OH、トレジャーファクトリー→TF、ブックオフ→BO、セカンドストリート→SS など + 店舗名
@@ -579,8 +591,7 @@ async function scanImages() {
 重要:
 - 必ずJSON配列のみを返してください（説明文不要）
 - 金額は数値のみ（¥やカンマなし）
-- 読み取れない項目は空文字""にしてください
-- 値札の場合は1商品として抽出`;
+- 読み取れない項目は空文字""にしてください`;
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -627,27 +638,55 @@ async function scanImages() {
   }
 }
 
+function findMatchingItemIndex(costPrice) {
+  const today = todayStr();
+  return items.findIndex(item =>
+    Number(item.costPrice) === Number(costPrice) &&
+    !item.supplier &&
+    item.purchaseDate === today
+  );
+}
+
+function updateSupplierForMatch(aiIndex, itemIndex) {
+  const r = aiResults[aiIndex];
+  items[itemIndex].supplier = r.supplier;
+  if (r.category && !items[itemIndex].category) items[itemIndex].category = r.category;
+  save(); renderAll();
+  aiResults.splice(aiIndex, 1); renderAiResults();
+  showToast('仕入先を更新しました');
+}
+
 function renderAiResults() {
   const container = document.getElementById('aiResults');
   if (aiResults.length === 0) { container.innerHTML = ''; return; }
 
-  let html = aiResults.map((r, i) => `
+  let newCount = 0;
+  let html = aiResults.map((r, i) => {
+    const matchIdx = r.supplier ? findMatchingItemIndex(r.costPrice) : -1;
+    const isMatch = matchIdx >= 0;
+    if (!isMatch) newCount++;
+    const matchedName = isMatch ? esc(items[matchIdx].productName || '登録済み商品') : '';
+    return `
     <div class="ai-result-card">
-      <div class="ar-name">${esc(r.productName || '不明')}</div>
+      ${isMatch ? `<div style="font-size:11px;color:#7c3aed;font-weight:600;margin-bottom:4px">🔗 既存商品と照合: ${matchedName}</div>` : ''}
+      <div class="ar-name">${esc(r.productName || (isMatch ? '（商品名は値札から取得済み）' : '不明'))}</div>
       <div class="ar-details">
         <span>仕入値: <b>¥${(r.costPrice||0).toLocaleString()}</b></span>
         ${r.supplier ? '<span>🏪 '+esc(r.supplier)+'</span>' : ''}
         ${r.category ? '<span>'+esc(r.category)+'</span>' : ''}
       </div>
-      ${r.memo ? '<div class="ar-details" style="margin-top:2px;font-style:italic">'+esc(r.memo)+'</div>' : ''}
       <div class="ai-result-actions">
-        <button class="btn-ar btn-ar-add" onclick="addAiResult(${i})">追加</button>
-        <button class="btn-ar btn-ar-edit" onclick="editAiResult(${i})">編集して追加</button>
+        ${isMatch
+          ? `<button class="btn-ar btn-ar-add" onclick="updateSupplierForMatch(${i},${matchIdx})">仕入先を更新</button>`
+          : `<button class="btn-ar btn-ar-add" onclick="addAiResult(${i})">追加</button>
+             <button class="btn-ar btn-ar-edit" onclick="editAiResult(${i})">編集して追加</button>`
+        }
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 
-  if (aiResults.length > 1) {
-    html += `<button class="btn-ar-all" onclick="addAllAiResults()">全${aiResults.length}件をまとめて追加</button>`;
+  if (newCount > 1) {
+    html += `<button class="btn-ar-all" onclick="addAllAiResults()">全${newCount}件をまとめて追加</button>`;
   }
   container.innerHTML = html;
 }
