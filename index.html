@@ -156,6 +156,7 @@
   }
   .btn-ar-add { background: #16a34a; color: #fff; }
   .btn-ar-edit { background: #fff; color: #6b7280; border: 1px solid #d1d5db; }
+  .btn-ar-del { background: #fff; color: #ef4444; border: 1px solid #fca5a5; }
   .btn-ar-all {
     width: 100%; padding: 12px; border: none; border-radius: 10px;
     background: #2563eb; color: #fff; font-size: 15px; font-weight: 700;
@@ -681,6 +682,7 @@ function renderAiResults() {
           : `<button class="btn-ar btn-ar-add" onclick="addAiResult(${i})">追加</button>
              <button class="btn-ar btn-ar-edit" onclick="editAiResult(${i})">編集して追加</button>`
         }
+        <button class="btn-ar btn-ar-del" onclick="removeAiResult(${i})">✕ 削除</button>
       </div>
     </div>`;
   }).join('');
@@ -721,6 +723,10 @@ function editAiResult(i) {
   liveCalc();
   aiResults.splice(i, 1); renderAiResults();
   document.getElementById('productName').focus();
+}
+
+function removeAiResult(i) {
+  aiResults.splice(i, 1); renderAiResults();
 }
 
 function addAllAiResults() {
