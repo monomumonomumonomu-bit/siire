@@ -176,6 +176,15 @@
   .no-api-hint {
     text-align: center; padding: 8px; font-size: 12px; color: #9ca3af;
   }
+  .receipt-match-panel { background: #fefce8; border: 1px solid #fde68a; border-radius: 12px; padding: 12px; margin-top: 8px; }
+  .rmp-header { font-size: 13px; font-weight: 700; color: #92400e; margin-bottom: 4px; }
+  .rmp-supplier { font-size: 15px; font-weight: 800; color: #1a1a1a; margin-bottom: 6px; }
+  .rmp-desc { font-size: 11px; color: #6b7280; margin-bottom: 10px; }
+  .rmp-item { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid #fde68a; cursor: pointer; }
+  .rmp-item:last-of-type { border-bottom: none; }
+  .rmp-item input[type="checkbox"] { width: 20px; height: 20px; accent-color: #7c3aed; flex-shrink: 0; }
+  .rmp-item-name { flex: 1; font-size: 13px; color: #1a1a1a; }
+  .rmp-item-price { font-size: 13px; font-weight: 700; color: #374151; flex-shrink: 0; }
   .no-api-hint a { color: #7c3aed; text-decoration: underline; cursor: pointer; }
 
   .list-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
@@ -652,49 +661,54 @@ async function scanImages() {
   }
 }
 
-function findMatchingItemIndex(costPrice) {
-  const today = todayStr();
-  return items.findIndex(item =>
-    Number(item.costPrice) === Number(costPrice) &&
-    !item.supplier &&
-    item.purchaseDate === today
-  );
-}
-
-function updateSupplierForMatch(aiIndex, itemIndex) {
-  const r = aiResults[aiIndex];
-  items[itemIndex].supplier = r.supplier;
-  if (r.category && !items[itemIndex].category) items[itemIndex].category = r.category;
-  save(); renderAll();
-  aiResults.splice(aiIndex, 1); renderAiResults();
-  showToast('仕入先を更新しました');
-}
-
 function renderAiResults() {
   const container = document.getElementById('aiResults');
   if (aiResults.length === 0) { container.innerHTML = ''; return; }
 
+  // レシートスキャン判定：仕入先が含まれていればレシートモード
+  const receiptSupplier = aiResults.find(r => r.supplier)?.supplier;
+  const today = todayStr();
+  const unmatchedToday = items
+    .map((item, idx) => ({ ...item, idx }))
+    .filter(item => !item.supplier && item.purchaseDate === today);
+
+  if (receiptSupplier && unmatchedToday.length > 0) {
+    // レシート照合モード：今日の未設定商品を一覧表示してまとめて更新
+    const receiptPrices = new Set(aiResults.map(r => Number(r.costPrice)).filter(p => p > 0));
+    let itemsHtml = unmatchedToday.map(item => {
+      const autoChecked = receiptPrices.has(Number(item.costPrice));
+      return `<label class="rmp-item">
+        <input type="checkbox" class="rmp-check" data-idx="${item.idx}" ${autoChecked ? 'checked' : ''}>
+        <span class="rmp-item-name">${esc(item.productName || '（商品名未設定）')}</span>
+        <span class="rmp-item-price">¥${Number(item.costPrice).toLocaleString()}</span>
+      </label>`;
+    }).join('');
+
+    container.innerHTML = `
+      <div class="receipt-match-panel">
+        <div class="rmp-header">🧾 レシート照合モード</div>
+        <div class="rmp-supplier">🏪 ${esc(receiptSupplier)}</div>
+        <div class="rmp-desc">仕入先を設定する商品にチェックを入れてください（金額一致は自動チェック済み）</div>
+        ${itemsHtml}
+        <button class="btn-ar-all" style="margin-top:10px" onclick="applySupplierToChecked('${receiptSupplier.replace(/'/g,"\\'")}')">チェックした商品の仕入先を更新</button>
+      </div>`;
+    return;
+  }
+
+  // 値札モード：通常の追加UI
   let newCount = 0;
   let html = aiResults.map((r, i) => {
-    const matchIdx = r.supplier ? findMatchingItemIndex(r.costPrice) : -1;
-    const isMatch = matchIdx >= 0;
-    if (!isMatch) newCount++;
-    const matchedName = isMatch ? esc(items[matchIdx].productName || '登録済み商品') : '';
+    newCount++;
     return `
     <div class="ai-result-card">
-      ${isMatch ? `<div style="font-size:11px;color:#7c3aed;font-weight:600;margin-bottom:4px">🔗 既存商品と照合: ${matchedName}</div>` : ''}
-      <div class="ar-name">${esc(r.productName || (isMatch ? '（商品名は値札から取得済み）' : '不明'))}</div>
+      <div class="ar-name">${esc(r.productName || '不明')}</div>
       <div class="ar-details">
         <span>仕入値: <b>¥${(r.costPrice||0).toLocaleString()}</b></span>
-        ${r.supplier ? '<span>🏪 '+esc(r.supplier)+'</span>' : ''}
         ${r.category ? '<span>'+esc(r.category)+'</span>' : ''}
       </div>
       <div class="ai-result-actions">
-        ${isMatch
-          ? `<button class="btn-ar btn-ar-add" onclick="updateSupplierForMatch(${i},${matchIdx})">仕入先を更新</button>`
-          : `<button class="btn-ar btn-ar-add" onclick="addAiResult(${i})">追加</button>
-             <button class="btn-ar btn-ar-edit" onclick="editAiResult(${i})">編集して追加</button>`
-        }
+        <button class="btn-ar btn-ar-add" onclick="addAiResult(${i})">追加</button>
+        <button class="btn-ar btn-ar-edit" onclick="editAiResult(${i})">編集して追加</button>
         <button class="btn-ar btn-ar-del" onclick="removeAiResult(${i})">✕ 削除</button>
       </div>
     </div>`;
@@ -704,6 +718,18 @@ function renderAiResults() {
     html += `<button class="btn-ar-all" onclick="addAllAiResults()">全${newCount}件をまとめて追加</button>`;
   }
   container.innerHTML = html;
+}
+
+function applySupplierToChecked(supplier) {
+  const checks = document.querySelectorAll('.rmp-check:checked');
+  checks.forEach(cb => {
+    const idx = Number(cb.dataset.idx);
+    if (items[idx]) items[idx].supplier = supplier;
+  });
+  const count = checks.length;
+  save(); renderAll();
+  aiResults = []; renderAiResults();
+  showToast(`${count}件の仕入先を更新しました`);
 }
 
 function addAiResult(i) {
