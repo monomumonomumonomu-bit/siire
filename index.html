@@ -87,6 +87,15 @@
   .form-group select { color: #6b7280; }
   .form-group select option { background: #fff; color: #1a1a1a; }
   .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  .profit-display {
+    background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px;
+    padding: 8px 10px; min-height: 42px; display: flex; align-items: center;
+  }
+  .profit-display .p-val { font-size: 16px; font-weight: 800; }
+  .profit-display .p-val.green { color: #16a34a; }
+  .profit-display .p-val.red { color: #dc2626; }
+  .profit-display .p-val.gray { color: #9ca3af; }
 
   .commission-display {
     padding: 12px 14px; background: #f9fafb; border: 1px solid #d1d5db;
@@ -349,7 +358,7 @@
           <input type="number" id="sellPrice" inputmode="numeric" placeholder="0" oninput="liveCalc()">
         </div>
       </div>
-      <div class="form-row">
+      <div class="form-row-3">
         <div class="form-group">
           <label>送料（円）</label>
           <input type="number" id="shipping" inputmode="numeric" placeholder="0" oninput="liveCalc()">
@@ -359,6 +368,10 @@
           <div class="commission-display">
             <span class="indicator">−</span> <span id="commDisplay">10%</span>
           </div>
+        </div>
+        <div class="form-group">
+          <label>利益</label>
+          <div class="profit-display"><span class="p-val gray" id="profitDisplay">−</span></div>
         </div>
       </div>
       <div class="form-row" style="margin-bottom:10px">
@@ -754,9 +767,18 @@ function addAllAiResults() {
 // === Live calc ===
 function liveCalc() {
   const sell = Number(document.getElementById('sellPrice').value) || 0;
+  const cost = Number(document.getElementById('costPrice').value) || 0;
+  const ship = Number(document.getElementById('shipping').value) || 0;
   const comm = Math.round(sell * COMMISSION_RATE);
   document.getElementById('commDisplay').textContent = sell > 0 ? `${COMMISSION_RATE*100}% (¥${comm.toLocaleString()})` : `${COMMISSION_RATE*100}%`;
-  const cost = Number(document.getElementById('costPrice').value) || 0;
+  const el = document.getElementById('profitDisplay');
+  if (sell === 0 && cost === 0) {
+    el.textContent = '−'; el.className = 'p-val gray';
+  } else {
+    const profit = sell - comm - cost - ship;
+    el.textContent = (profit >= 0 ? '+' : '') + '¥' + profit.toLocaleString();
+    el.className = 'p-val ' + (profit > 0 ? 'green' : profit < 0 ? 'red' : 'gray');
+  }
 }
 
 function toggleForm() {
