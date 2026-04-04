@@ -826,6 +826,7 @@ function formatDate(dateStr) { if (!dateStr) return ''; const d = new Date(dateS
 function dayOfWeek(dateStr) { const days=['日','月','火','水','木','金','土']; return days[new Date(dateStr+'T00:00:00').getDay()]; }
 
 function addItem() {
+  try {
   const name = document.getElementById('productName').value.trim();
   const cost = Number(document.getElementById('costPrice').value) || 0;
   const sell = Number(document.getElementById('sellPrice').value) || 0;
@@ -848,6 +849,7 @@ function addItem() {
   else items.unshift(item);
   save(); clearForm(); renderAll();
   showToast('追加しました');
+  } catch(e) { alert('エラー: ' + e.message); }
 }
 
 function editItem(gi) {
