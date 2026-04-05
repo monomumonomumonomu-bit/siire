@@ -328,8 +328,7 @@
   </div>
   <div class="dash-row2">
     <div class="dash-card"><div class="d-label">平均粗利単価</div><div class="d-value" id="dAvgProfit">¥0</div></div>
-    <div class="dash-card"><div class="d-label">平均粗利率</div><div class="d-value green" id="dMargin">0%</div></div>
-  </div>
+    <div class="dash-card"><div class="d-label">平均粗利率</div><div class="d-value green" id="dMargin">0%</div></div></div>
 
   <div class="date-tabs" id="dateTabs"></div>
 
@@ -474,7 +473,7 @@ let storeCount = Number(localStorage.getItem('shiire_stores') || '0');
 let editIndex = -1;
 let scanMode = 'tag'; // 'tag'=値札 / 'receipt'=レシート
 let uploadedImages = []; // {dataUrl, base64, mediaType}
-let currentDateFilter = 'today';
+let currentDateFilter = todayStr();
 let COMMISSION_RATE = Number(localStorage.getItem('shiire_comm_rate') || '10') / 100;
 let aiResults = [];
 
@@ -547,10 +546,12 @@ function changeStores(delta) {
 function buildDateTabs() {
   const container = document.getElementById('dateTabs');
   const today = todayStr();
-  const yest = (() => { const d = new Date(); d.setDate(d.getDate()-1); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); })();
   const allDates = [...new Set(items.map(it => it.purchaseDate).filter(Boolean))].sort().reverse();
-  const tabs = [{ label: '今日', key: 'today' }, { label: '昨日', key: yest }];
-  allDates.forEach(d => { if (d === today || d === yest) return; const dt = new Date(d+'T00:00:00'); tabs.push({ label: (dt.getMonth()+1)+'/'+dt.getDate(), key: d }); });
+  if (!allDates.includes(today)) allDates.unshift(today);
+  const tabs = allDates.map(d => {
+    const dt = new Date(d+'T00:00:00');
+    return { label: (dt.getMonth()+1)+'/'+(dt.getDate()), key: d };
+  });
   tabs.push({ label: '全件', key: 'all' });
   container.innerHTML = tabs.map(t => `<button class="date-tab${t.key===currentDateFilter?' active':''}" data-key="${t.key}">${t.label}</button>`).join('');
   container.querySelectorAll('.date-tab').forEach(btn => btn.addEventListener('click', () => {
@@ -559,7 +560,7 @@ function buildDateTabs() {
     btn.classList.add('active'); renderAll();
   }));
 }
-function resolveDate(key) { return key === 'today' ? todayStr() : key; }
+function resolveDate(key) { return key; }
 function filteredItems() {
   if (currentDateFilter === 'all') return items;
   return items.filter(it => it.purchaseDate === resolveDate(currentDateFilter));
@@ -572,6 +573,7 @@ function compressImage(file) {
     reader.onload = e => {
       const img = new Image();
       img.onload = () => {
+        // 長辺を1280px以下に縮小
         const maxPx = 1280;
         let w = img.width, h = img.height;
         if (w > maxPx || h > maxPx) {
@@ -581,6 +583,7 @@ function compressImage(file) {
         const canvas = document.createElement('canvas');
         canvas.width = w; canvas.height = h;
         canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        // 3MB以下になるまで品質を段階的に下げる（base64は約4/3倍のサイズ）
         const limitBytes = 3 * 1024 * 1024;
         let quality = 0.8;
         let dataUrl = canvas.toDataURL('image/jpeg', quality);
@@ -695,6 +698,7 @@ JSONフォーマット（配列で返す）:
     const data = await response.json();
     const text = data.content?.[0]?.text || '';
 
+    // Extract JSON array from response
     const jsonMatch = text.match(/\[[\s\S]*\]/);
     if (!jsonMatch) throw new Error('読み取り結果を解析できませんでした');
 
@@ -716,6 +720,7 @@ function renderAiResults() {
   const container = document.getElementById('aiResults');
   if (aiResults.length === 0) { container.innerHTML = ''; return; }
 
+  // スキャンモードで分岐（ユーザーが明示的に選択）
   const receiptSupplier = scanMode === 'receipt' ? (aiResults.find(r => r.supplier)?.supplier || '（読み取り中）') : null;
   const today = todayStr();
   const unmatchedToday = items
@@ -723,6 +728,7 @@ function renderAiResults() {
     .filter(item => !item.supplier && item.purchaseDate === today);
 
   if (receiptSupplier && unmatchedToday.length > 0) {
+    // レシート照合モード：今日の未設定商品を一覧表示してまとめて更新
     const receiptDate = aiResults.find(r => r.purchaseDate)?.purchaseDate || '';
     const receiptPrices = new Set(aiResults.map(r => Number(r.costPrice)).filter(p => p > 0));
     let itemsHtml = unmatchedToday.map(item => {
@@ -747,6 +753,7 @@ function renderAiResults() {
     return;
   }
 
+  // 値札モード：通常の追加UI
   let newCount = 0;
   let html = aiResults.map((r, i) => {
     newCount++;
@@ -789,7 +796,7 @@ function applySupplierToChecked(supplier, purchaseDate) {
 function addAiResult(i) {
   const r = aiResults[i];
   const cost = Number(r.costPrice) || 0;
-  const purchaseDate = r.purchaseDate || ((currentDateFilter === 'all' || currentDateFilter === 'today') ? todayStr() : resolveDate(currentDateFilter));
+  const purchaseDate = r.purchaseDate || (currentDateFilter === 'all' ? todayStr() : currentDateFilter);
   const item = {
     productName: r.productName || '商品',
     costPrice: cost, sellPrice: 0, shipping: 0,
@@ -823,7 +830,7 @@ function removeAiResult(i) {
 }
 
 function addAllAiResults() {
-  const defaultDate = (currentDateFilter === 'all' || currentDateFilter === 'today') ? todayStr() : resolveDate(currentDateFilter);
+  const defaultDate = currentDateFilter === 'all' ? todayStr() : currentDateFilter;
   const imgs = uploadedImages.map(img => img.dataUrl);
   aiResults.forEach(r => {
     const cost = Number(r.costPrice) || 0;
@@ -879,7 +886,7 @@ function addItem() {
   const comm = Math.round(sell * COMMISSION_RATE);
   const profit = sell - cost - comm - ship;
   const margin = sell > 0 ? (profit / sell * 100) : 0;
-  const purchaseDate = (currentDateFilter === 'all' || currentDateFilter === 'today') ? todayStr() : resolveDate(currentDateFilter);
+  const purchaseDate = currentDateFilter === 'all' ? todayStr() : currentDateFilter;
   const item = {
     productName: name || ('商品'+(items.length+1)),
     costPrice: cost, sellPrice: sell, shipping: ship,
@@ -910,7 +917,7 @@ function editItem(gi) {
   renderPhotos(); editIndex = gi; liveCalc();
   document.getElementById('formBody').classList.remove('collapsed');
   document.getElementById('formArrow').classList.remove('closed');
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  setTimeout(() => { document.querySelector('.form-section').scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 100);
 }
 
 function deleteItem(gi) { items.splice(gi, 1); save(); renderAll(); showToast('削除しました'); }
@@ -920,7 +927,6 @@ function clearForm() {
   document.getElementById('category').value = '';
   document.getElementById('commDisplay').textContent = `${COMMISSION_RATE*100}%`;
   uploadedImages = []; renderPhotos(); updateScanBtn();
-  aiResults = []; renderAiResults();
   editIndex = -1;
 }
 
@@ -986,39 +992,42 @@ function renderList() {
   container.innerHTML = html;
 }
 
+// スプレッドシート貼り付け用（タブ区切り・D〜J列順）
 function copyForSheet() {
   const fi = filteredItems();
   if (fi.length === 0) { showToast('データがありません'); return; }
   const rows = fi.map(item => [
-    item.productName,
-    item.category||'',
-    '',
-    formatDate(item.purchaseDate),
-    item.costPrice,
-    item.supplier||'',
-    'レシート'
+    item.productName,   // D: 品名
+    item.category||'',  // E: カテゴリー
+    '',                 // F: (空欄)
+    formatDate(item.purchaseDate), // G: 仕入れ日
+    item.costPrice,     // H: 金額
+    item.supplier||'',  // I: 仕入れ先
+    'レシート'           // J: 確認方法
   ].join('\t'));
   navigator.clipboard.writeText(rows.join('\n')).then(() => showToast('スプレッドシート用にコピーしました'));
 }
 
+// スプレッドシート取り込み用CSV（D〜J列順）
 function exportCSV() {
   const fi = filteredItems();
   if (fi.length === 0) { showToast('データがありません'); return; }
+  // ヘッダーはスプレッドシートの列名に合わせる
   const header = '品名,カテゴリー,,仕入れ日,金額,仕入れ先,確認方法';
   const rows = fi.map(item => [
     q(item.productName),
     q(item.category||''),
-    '',
-    formatDate(item.purchaseDate),
-    item.costPrice,
-    q(item.supplier||''),
-    'レシート'
+    '',                              // F列（空）
+    formatDate(item.purchaseDate),   // G: 2026/3/31形式
+    item.costPrice,                  // H: 税込仕入れ値
+    q(item.supplier||''),            // I: 仕入れ先
+    'レシート'                        // J: 確認方法
   ].join(','));
   const csv = '\uFEFF'+header+'\n'+rows.join('\n');
   const blob = new Blob([csv],{type:'text/csv;charset=utf-8'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = '仕入れ管理表_'+(currentDateFilter==='all'?'全件':resolveDate(currentDateFilter))+'.csv';
+  a.download = '仕入れ管理表_'+(currentDateFilter==='all'?'全件':currentDateFilter)+'.csv';
   a.click(); showToast('CSVを出力しました');
 }
 
