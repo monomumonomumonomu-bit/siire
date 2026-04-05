@@ -565,12 +565,14 @@ function filteredItems() {
 }
 
 // === Photos ===
-function compressImage(file, maxSizeMB = 4, maxPx = 1920) {
+function compressImage(file) {
   return new Promise(resolve => {
     const reader = new FileReader();
     reader.onload = e => {
       const img = new Image();
       img.onload = () => {
+        // 長辺を1280px以下に縮小
+        const maxPx = 1280;
         let w = img.width, h = img.height;
         if (w > maxPx || h > maxPx) {
           if (w > h) { h = Math.round(h * maxPx / w); w = maxPx; }
@@ -579,10 +581,11 @@ function compressImage(file, maxSizeMB = 4, maxPx = 1920) {
         const canvas = document.createElement('canvas');
         canvas.width = w; canvas.height = h;
         canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-        let quality = 0.85;
+        // 3MB以下になるまで品質を段階的に下げる（base64は約4/3倍のサイズ）
+        const limitBytes = 3 * 1024 * 1024;
+        let quality = 0.8;
         let dataUrl = canvas.toDataURL('image/jpeg', quality);
-        // 4MB以下になるまで品質を下げる
-        while (dataUrl.length * 0.75 > maxSizeMB * 1024 * 1024 && quality > 0.3) {
+        while (dataUrl.length > limitBytes * (4/3) && quality > 0.2) {
           quality -= 0.1;
           dataUrl = canvas.toDataURL('image/jpeg', quality);
         }
