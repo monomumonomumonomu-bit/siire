@@ -572,7 +572,6 @@ function compressImage(file) {
     reader.onload = e => {
       const img = new Image();
       img.onload = () => {
-        // 長辺を1280px以下に縮小
         const maxPx = 1280;
         let w = img.width, h = img.height;
         if (w > maxPx || h > maxPx) {
@@ -582,7 +581,6 @@ function compressImage(file) {
         const canvas = document.createElement('canvas');
         canvas.width = w; canvas.height = h;
         canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-        // 3MB以下になるまで品質を段階的に下げる（base64は約4/3倍のサイズ）
         const limitBytes = 3 * 1024 * 1024;
         let quality = 0.8;
         let dataUrl = canvas.toDataURL('image/jpeg', quality);
@@ -646,11 +644,13 @@ async function scanImages() {
 - 商品ごとの金額: costPrice に入れる
 - 商品名（記載があれば）: productName に入れる（不明なら""）
 - レシートに複数商品があれば商品ごとに分ける
+- レシートの発行日（購入日）: purchaseDate に YYYY-MM-DD 形式で入れる（読み取れない場合は""）
+  ※ 全商品に同じ日付を入れること
 
 店舗名の略称ルール: ハードオフ→HO、オフハウス→OH、トレジャーファクトリー→TF、ブックオフ→BO、セカンドストリート→SS など + 店舗名
 
 JSONフォーマット（配列で返す）:
-[{"productName":"","costPrice":数値,"supplier":"店舗名","category":"","memo":""}]
+[{"productName":"","costPrice":数値,"supplier":"店舗名","purchaseDate":"YYYY-MM-DD","category":"","memo":""}]
 
 重要: JSON配列のみ返す。金額は数値のみ（¥やカンマなし）。`
   : `これはせどり（転売ビジネス）の値札です。
@@ -695,7 +695,6 @@ JSONフォーマット（配列で返す）:
     const data = await response.json();
     const text = data.content?.[0]?.text || '';
 
-    // Extract JSON array from response
     const jsonMatch = text.match(/\[[\s\S]*\]/);
     if (!jsonMatch) throw new Error('読み取り結果を解析できませんでした');
 
@@ -717,7 +716,6 @@ function renderAiResults() {
   const container = document.getElementById('aiResults');
   if (aiResults.length === 0) { container.innerHTML = ''; return; }
 
-  // スキャンモードで分岐（ユーザーが明示的に選択）
   const receiptSupplier = scanMode === 'receipt' ? (aiResults.find(r => r.supplier)?.supplier || '（読み取り中）') : null;
   const today = todayStr();
   const unmatchedToday = items
@@ -725,7 +723,7 @@ function renderAiResults() {
     .filter(item => !item.supplier && item.purchaseDate === today);
 
   if (receiptSupplier && unmatchedToday.length > 0) {
-    // レシート照合モード：今日の未設定商品を一覧表示してまとめて更新
+    const receiptDate = aiResults.find(r => r.purchaseDate)?.purchaseDate || '';
     const receiptPrices = new Set(aiResults.map(r => Number(r.costPrice)).filter(p => p > 0));
     let itemsHtml = unmatchedToday.map(item => {
       const autoChecked = receiptPrices.has(Number(item.costPrice));
@@ -735,19 +733,20 @@ function renderAiResults() {
         <span class="rmp-item-price">¥${Number(item.costPrice).toLocaleString()}</span>
       </label>`;
     }).join('');
+    const dateLabel = receiptDate ? `<div class="rmp-desc" style="color:#92400e;font-weight:700">📅 仕入日: ${receiptDate}</div>` : '';
 
     container.innerHTML = `
       <div class="receipt-match-panel">
         <div class="rmp-header">🧾 レシート照合モード</div>
         <div class="rmp-supplier">🏪 ${esc(receiptSupplier)}</div>
-        <div class="rmp-desc">仕入先を設定する商品にチェックを入れてください（金額一致は自動チェック済み）</div>
+        ${dateLabel}
+        <div class="rmp-desc">仕入先${receiptDate ? '・仕入日' : ''}を設定する商品にチェックを入れてください（金額一致は自動チェック済み）</div>
         ${itemsHtml}
-        <button class="btn-ar-all" style="margin-top:10px" onclick="applySupplierToChecked('${receiptSupplier.replace(/'/g,"\\'")}')">チェックした商品の仕入先を更新</button>
+        <button class="btn-ar-all" style="margin-top:10px" onclick="applySupplierToChecked('${receiptSupplier.replace(/'/g,"\\'")}','${receiptDate}')">チェックした商品を更新</button>
       </div>`;
     return;
   }
 
-  // 値札モード：通常の追加UI
   let newCount = 0;
   let html = aiResults.map((r, i) => {
     newCount++;
@@ -772,22 +771,25 @@ function renderAiResults() {
   container.innerHTML = html;
 }
 
-function applySupplierToChecked(supplier) {
+function applySupplierToChecked(supplier, purchaseDate) {
   const checks = document.querySelectorAll('.rmp-check:checked');
   checks.forEach(cb => {
     const idx = Number(cb.dataset.idx);
-    if (items[idx]) items[idx].supplier = supplier;
+    if (items[idx]) {
+      items[idx].supplier = supplier;
+      if (purchaseDate) items[idx].purchaseDate = purchaseDate;
+    }
   });
   const count = checks.length;
   save(); renderAll();
   aiResults = []; renderAiResults();
-  showToast(`${count}件の仕入先を更新しました`);
+  showToast(`${count}件の仕入先${purchaseDate ? '・仕入日' : ''}を更新しました`);
 }
 
 function addAiResult(i) {
   const r = aiResults[i];
   const cost = Number(r.costPrice) || 0;
-  const purchaseDate = (currentDateFilter === 'all' || currentDateFilter === 'today') ? todayStr() : resolveDate(currentDateFilter);
+  const purchaseDate = r.purchaseDate || ((currentDateFilter === 'all' || currentDateFilter === 'today') ? todayStr() : resolveDate(currentDateFilter));
   const item = {
     productName: r.productName || '商品',
     costPrice: cost, sellPrice: 0, shipping: 0,
@@ -821,10 +823,11 @@ function removeAiResult(i) {
 }
 
 function addAllAiResults() {
-  const purchaseDate = (currentDateFilter === 'all' || currentDateFilter === 'today') ? todayStr() : resolveDate(currentDateFilter);
+  const defaultDate = (currentDateFilter === 'all' || currentDateFilter === 'today') ? todayStr() : resolveDate(currentDateFilter);
   const imgs = uploadedImages.map(img => img.dataUrl);
   aiResults.forEach(r => {
     const cost = Number(r.costPrice) || 0;
+    const purchaseDate = r.purchaseDate || defaultDate;
     items.unshift({
       productName: r.productName || '商品',
       costPrice: cost, sellPrice: 0, shipping: 0,
@@ -983,36 +986,33 @@ function renderList() {
   container.innerHTML = html;
 }
 
-// スプレッドシート貼り付け用（タブ区切り・D〜J列順）
 function copyForSheet() {
   const fi = filteredItems();
   if (fi.length === 0) { showToast('データがありません'); return; }
   const rows = fi.map(item => [
-    item.productName,   // D: 品名
-    item.category||'',  // E: カテゴリー
-    '',                 // F: (空欄)
-    formatDate(item.purchaseDate), // G: 仕入れ日
-    item.costPrice,     // H: 金額
-    item.supplier||'',  // I: 仕入れ先
-    'レシート'           // J: 確認方法
+    item.productName,
+    item.category||'',
+    '',
+    formatDate(item.purchaseDate),
+    item.costPrice,
+    item.supplier||'',
+    'レシート'
   ].join('\t'));
   navigator.clipboard.writeText(rows.join('\n')).then(() => showToast('スプレッドシート用にコピーしました'));
 }
 
-// スプレッドシート取り込み用CSV（D〜J列順）
 function exportCSV() {
   const fi = filteredItems();
   if (fi.length === 0) { showToast('データがありません'); return; }
-  // ヘッダーはスプレッドシートの列名に合わせる
   const header = '品名,カテゴリー,,仕入れ日,金額,仕入れ先,確認方法';
   const rows = fi.map(item => [
     q(item.productName),
     q(item.category||''),
-    '',                              // F列（空）
-    formatDate(item.purchaseDate),   // G: 2026/3/31形式
-    item.costPrice,                  // H: 税込仕入れ値
-    q(item.supplier||''),            // I: 仕入れ先
-    'レシート'                        // J: 確認方法
+    '',
+    formatDate(item.purchaseDate),
+    item.costPrice,
+    q(item.supplier||''),
+    'レシート'
   ].join(','));
   const csv = '\uFEFF'+header+'\n'+rows.join('\n');
   const blob = new Blob([csv],{type:'text/csv;charset=utf-8'});
