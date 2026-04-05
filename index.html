@@ -982,7 +982,10 @@ function exportCSV() {
 
 function q(s) { return '"'+(s||'').replace(/"/g,'""')+'"'; }
 function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-function save() { localStorage.setItem('shiire_items', JSON.stringify(items)); }
+function save() {
+  const toSave = items.map(({images, ...rest}) => rest);
+  localStorage.setItem('shiire_items', JSON.stringify(toSave));
+}
 function showToast(msg, isError) {
   const t = document.getElementById('toast');
   t.textContent = msg; t.className = 'toast' + (isError ? ' error' : '');
