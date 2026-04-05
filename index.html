@@ -458,7 +458,9 @@
 <div class="toast" id="toast"></div>
 
 <script>
-let items = JSON.parse(localStorage.getItem('shiire_items') || '[]');
+let items = JSON.parse(localStorage.getItem('shiire_items') || '[]').map(({images, ...rest}) => rest);
+// 既存データから画像を除去して即座に保存し直す（容量解放）
+try { localStorage.setItem('shiire_items', JSON.stringify(items)); } catch(e) {}
 let storeCount = Number(localStorage.getItem('shiire_stores') || '0');
 let editIndex = -1;
 let uploadedImages = []; // {dataUrl, base64, mediaType}
