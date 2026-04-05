@@ -124,6 +124,10 @@
     padding: 12px; margin-bottom: 12px;
   }
   .scan-label { font-size: 13px; font-weight: 600; color: #4b5563; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+  .scan-mode-toggle { display: flex; gap: 6px; margin-bottom: 10px; }
+  .scan-mode-btn { flex: 1; padding: 8px; border: 2px solid #d1d5db; border-radius: 10px; background: #fff; font-size: 13px; font-weight: 600; color: #6b7280; cursor: pointer; }
+  .scan-mode-btn.active-tag { border-color: #7c3aed; background: #f5f3ff; color: #7c3aed; }
+  .scan-mode-btn.active-receipt { border-color: #d97706; background: #fffbeb; color: #d97706; }
   .photo-row {
     display: flex; gap: 8px; align-items: center; margin-bottom: 8px;
     overflow-x: auto; padding-bottom: 4px; -webkit-overflow-scrolling: touch;
@@ -339,7 +343,11 @@
 
       <!-- AI Scan area -->
       <div class="scan-area">
-        <div class="scan-label">🤖 AI読み取り（レシート・値札）</div>
+        <div class="scan-mode-toggle">
+          <button class="scan-mode-btn active-tag" id="btnModeTag" type="button" onclick="setScanMode('tag')">🏷️ 値札</button>
+          <button class="scan-mode-btn" id="btnModeReceipt" type="button" onclick="setScanMode('receipt')">🧾 レシート</button>
+        </div>
+        <div class="scan-label">🤖 AI読み取り</div>
         <div class="photo-row" id="photoRow">
           <div class="photo-add" id="photoCameraBtn">
             📷 <input type="file" id="fileInput" accept="image/*" multiple capture="environment">
@@ -463,6 +471,7 @@ let items = JSON.parse(localStorage.getItem('shiire_items') || '[]').map(({image
 try { localStorage.setItem('shiire_items', JSON.stringify(items)); } catch(e) {}
 let storeCount = Number(localStorage.getItem('shiire_stores') || '0');
 let editIndex = -1;
+let scanMode = 'tag'; // 'tag'=値札 / 'receipt'=レシート
 let uploadedImages = []; // {dataUrl, base64, mediaType}
 let currentDateFilter = 'today';
 let COMMISSION_RATE = Number(localStorage.getItem('shiire_comm_rate') || '10') / 100;
@@ -487,6 +496,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // === API key ===
 function getApiKey() { return localStorage.getItem('shiire_api_key') || ''; }
+function setScanMode(mode) {
+  scanMode = mode;
+  document.getElementById('btnModeTag').className = 'scan-mode-btn' + (mode === 'tag' ? ' active-tag' : '');
+  document.getElementById('btnModeReceipt').className = 'scan-mode-btn' + (mode === 'receipt' ? ' active-receipt' : '');
+  aiResults = []; renderAiResults();
+}
+
 function checkApiKey() {
   const hasKey = !!getApiKey();
   document.getElementById('btnScan').disabled = !hasKey && uploadedImages.length === 0;
@@ -595,38 +611,35 @@ async function scanImages() {
     source: { type: 'base64', media_type: img.mediaType, data: img.base64 }
   }));
 
-  const prompt = `これはせどり（転売ビジネス）の仕入れに関する写真です。値札のみ・レシートのみ・両方のいずれかです。
+  const prompt = scanMode === 'receipt'
+  ? `これはせどり（転売ビジネス）のレシートです。
 
-【写真の種類に応じた処理】
-■ 値札のみの場合:
-  - 商品名・型番・金額を抽出する
-  - 仕入先(supplier)は空文字""にする（値札には店舗名がない）
-
-■ レシートのみの場合:
-  - 仕入先・金額・商品名（記載があれば）を抽出する
-  - 商品名が不明な場合はproductNameを空文字""にする
-  - レシートに複数商品があれば商品ごとに分ける
-
-■ 値札とレシートの両方がある場合:
-  - 金額や商品名で同一商品と判断できるものは必ず1件にまとめる
-  - 値札の商品名・型番 ＋ レシートの仕入先 を統合する
-  - 絶対に重複エントリを作らない
-
-各商品のJSONフォーマット:
-{
-  "productName": "ブランド/メーカー名 商品名 型番",
-  "costPrice": 税込仕入れ値（数値）,
-  "supplier": "店舗名略称（レシートから取得、例: HO藤沢）",
-  "category": "カテゴリー（家電/オーディオ/PC・周辺機器/カメラ/ゲーム/おもちゃ・ホビー/楽器/ファッション/ブランド品/スポーツ/工具/本・メディア/その他）",
-  "memo": ""
-}
+抽出内容:
+- 仕入先（店舗名）: supplier に入れる
+- 商品ごとの金額: costPrice に入れる
+- 商品名（記載があれば）: productName に入れる（不明なら""）
+- レシートに複数商品があれば商品ごとに分ける
 
 店舗名の略称ルール: ハードオフ→HO、オフハウス→OH、トレジャーファクトリー→TF、ブックオフ→BO、セカンドストリート→SS など + 店舗名
 
-重要:
-- 必ずJSON配列のみを返してください（説明文不要）
-- 金額は数値のみ（¥やカンマなし）
-- 読み取れない項目は空文字""にしてください`;
+JSONフォーマット（配列で返す）:
+[{"productName":"","costPrice":数値,"supplier":"店舗名","category":"","memo":""}]
+
+重要: JSON配列のみ返す。金額は数値のみ（¥やカンマなし）。`
+  : `これはせどり（転売ビジネス）の値札です。
+
+抽出内容:
+- 商品名・ブランド・型番: productName に入れる
+- 税込価格: costPrice に入れる
+- supplier は必ず空文字""にする（値札には店舗名がない）
+- カテゴリー: category に入れる
+
+JSONフォーマット（配列で返す）:
+[{"productName":"商品名","costPrice":数値,"supplier":"","category":"カテゴリー","memo":""}]
+
+カテゴリー選択肢: 家電/オーディオ/PC・周辺機器/カメラ/ゲーム/おもちゃ・ホビー/楽器/ファッション/ブランド品/スポーツ/工具/本・メディア/その他
+
+重要: JSON配列のみ返す。金額は数値のみ（¥やカンマなし）。`;
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -677,8 +690,8 @@ function renderAiResults() {
   const container = document.getElementById('aiResults');
   if (aiResults.length === 0) { container.innerHTML = ''; return; }
 
-  // レシートスキャン判定：仕入先が含まれていればレシートモード
-  const receiptSupplier = aiResults.find(r => r.supplier)?.supplier;
+  // スキャンモードで分岐（ユーザーが明示的に選択）
+  const receiptSupplier = scanMode === 'receipt' ? (aiResults.find(r => r.supplier)?.supplier || '（読み取り中）') : null;
   const today = todayStr();
   const unmatchedToday = items
     .map((item, idx) => ({ ...item, idx }))
