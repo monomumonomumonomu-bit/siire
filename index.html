@@ -333,13 +333,22 @@
 
   <div class="date-tabs" id="dateTabs"></div>
 
+  <div class="list-header">
+    <div class="list-title">📦 商品一覧（<span id="listCount">0</span>点）</div>
+    <div class="list-btns">
+      <button class="btn-sm-action" onclick="copyForSheet()">📋 コピー</button>
+      <button class="btn-sm-action" onclick="exportCSV()">📤 CSV</button>
+    </div>
+  </div>
+  <div id="productList"></div>
+
   <!-- Scan & Add form -->
-  <div class="form-section">
+  <div class="form-section" style="margin-top:8px">
     <div class="section-header" onclick="toggleForm()">
       <span class="plus">＋</span> 商品を追加
-      <span class="arrow" id="formArrow">▼</span>
+      <span class="arrow closed" id="formArrow">▼</span>
     </div>
-    <div class="form-body" id="formBody">
+    <div class="form-body collapsed" id="formBody">
 
       <!-- AI Scan area -->
       <div class="scan-area">
@@ -423,14 +432,6 @@
     <button class="btn-add" id="btnAdd" type="button" onclick="addItem()">追加する</button>
   </div>
 
-  <div class="list-header">
-    <div class="list-title">📦 商品一覧（<span id="listCount">0</span>点）</div>
-    <div class="list-btns">
-      <button class="btn-sm-action" onclick="copyForSheet()">📋 コピー</button>
-      <button class="btn-sm-action" onclick="exportCSV()">📤 CSV</button>
-    </div>
-  </div>
-  <div id="productList"></div>
 </div>
 
 <!-- Settings -->
